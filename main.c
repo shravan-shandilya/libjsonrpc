@@ -21,7 +21,7 @@ int main(){
 	print_usage();
 	while(command = getchar()){
 		switch(command){
-			case 's': jsonrpc_server_start(8547);
+			case 's': jsonrpc_server_start(2000);
 				  break;
 			case 'k': return jsonrpc_server_stop();		
 		}

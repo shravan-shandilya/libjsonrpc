@@ -16,7 +16,7 @@ int main(){
 	}
 
 	client_sock.sin_addr.s_addr = inet_addr("127.0.0.1");
-	client_sock.sin_port = 8547;
+	client_sock.sin_port = 2000;
 	client_sock.sin_family = AF_INET;
 	
 	res = connect(sock_fd,(struct sockaddr*)&client_sock,sizeof(struct sockaddr_in));

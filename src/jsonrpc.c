@@ -29,14 +29,12 @@ jsonrpc_method jsonrpc_methods[MAX_METHODS];
 
 
 int jsonrpc_register_method(char *method, json_t * (*jsonrpc_method)(jsonrpc_connection*,json_t*)){
-	if(server_status){
-		if(jsonrpc_method_index < MAX_METHODS){
-			jsonrpc_methods_name[jsonrpc_method_index] = method;
-			jsonrpc_methods[jsonrpc_method_index] = jsonrpc_method;
-			syslog(LOG_INFO,"added jsonrpc_method %s with %p",method,jsonrpc_method);
-		}else{
-			syslog(LOG_ERR,"max methods reached!");
-		}
+	if(jsonrpc_method_index < MAX_METHODS){
+		jsonrpc_methods_name[jsonrpc_method_index] = method;
+		jsonrpc_methods[jsonrpc_method_index] = jsonrpc_method;
+		syslog(LOG_INFO,"added jsonrpc_method %s with %p",jsonrpc_methods_name[jsonrpc_method_index],jsonrpc_methods[jsonrpc_method_index]);
+	}else{
+		syslog(LOG_ERR,"max methods reached!");
 	}
 }
 
@@ -52,11 +50,15 @@ void jsonrpc_connection_handler(void * client_sock_fd){
 	struct pollfd *fds =(struct pollfd*) malloc(sizeof(struct pollfd));
 	fds->fd = client_fd;
 	fds->events = POLLIN;
-	while( poll(fds,1,60*1000) && (fds->revents&POLLIN == POLLIN) && server_status){
+	res = poll(fds,1,60*1000);
+	if(res > 0)
+	while((fds->revents&POLLIN == POLLIN) && server_status){
 		res = recv(client_fd,buffer,10,0);
 		//parse message here and invoke jsonrpc method
-		syslog(LOG_INFO,"Function pointer %p",jsonrpc_methods[jsonrpc_method_index-1]);
+		syslog(LOG_INFO,"Function pointer %p",jsonrpc_methods[jsonrpc_method_index]);
 		//syslog(LOG_INFO,"Recieved from %d: %s",client_fd,buffer);
+		jsonrpc_methods[jsonrpc_method_index](NULL,NULL);
+		perror("Calling function");
 	}
 }
 void jsonrpc_connection_acceptor(){
@@ -66,7 +68,7 @@ void jsonrpc_connection_acceptor(){
 	while(server_status){
 		if(connections < MAX_CONNECTIONS){
 			//server socket accept
-			syslog(LOG_INFO,"Accepting connections");
+			//syslog(LOG_INFO,"Accepting connections");
 			int count = sizeof(struct sockaddr);
 			res = accept(server_socket_fd,(struct sockaddr_in*)&client_socket,(socklen_t*)&count);
 			if(res < 0){
@@ -153,7 +155,7 @@ int jsonrpc_server_stop(){
 	}
 	
 	//loop through all handlers and kill them
-	for(i=0;i<=handler_threads_index;i++){
+	for(i=0;i<handler_threads_index;i++){
 		res = pthread_kill(handlers[i],9);
 		if(res != 0){
 			syslog(LOG_ERR,"couldnot kill handler thread at index %d",i);
@@ -161,7 +163,7 @@ int jsonrpc_server_stop(){
 	}
 	
 	//loop thorugh all client socket fd and close them
-	for(i=0;i<=handler_threads_index;i++){
+	for(i=0;i<handler_threads_index;i++){
 		res = close(client_socket_fd[i]);
 		if(res < 0){
 			syslog(LOG_ERR,"Couldnt close client socket fd at index %d",i);
