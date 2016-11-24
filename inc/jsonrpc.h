@@ -2,6 +2,12 @@
 #define JSONRPC_H
 
 #include<jansson.h>
+
+//constants
+#define RESPONSE_TYPE_FAILURE 0
+#define RESPONSE_TYPE_SUCESS 1
+
+
 typedef enum _bool{
 	false,
 	true
@@ -10,13 +16,15 @@ typedef enum _bool{
 typedef struct{
 	int client_fd;
 	bool connection_status;
+	char *id;
 }jsonrpc_connection;
 
 
 int jsonrpc_server_start(int port);
 int jsonrpc_server_stop();
+int jsonrpc_send_response(int,int,json_t*,char*);
 
-typedef json_t* (*jsonrpc_method)(jsonrpc_connection*,json_t*);
+typedef int (*jsonrpc_method)(jsonrpc_connection*,json_t*);
 
 int jsonrpc_register_method(char*,jsonrpc_method);
 

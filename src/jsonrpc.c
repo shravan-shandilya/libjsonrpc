@@ -16,6 +16,8 @@ bool server_status = false;
 int server_port,server_socket_fd,connections;
 pthread_t handlers[MAX_CONNECTIONS];
 int client_socket_fd[MAX_CONNECTIONS];
+jsonrpc_connection client_connections[MAX_CONNECTIONS];
+
 int handler_threads_index = 0;
 pthread_t jsonrpc_connection_acceptor_thread;
 struct sockaddr_in server_socket,client_socket;
@@ -25,10 +27,20 @@ int jsonrpc_method_index = 0;
 char *jsonrpc_methods_name[MAX_METHODS];
 jsonrpc_method jsonrpc_methods[MAX_METHODS];
 
-//polling for read on fd
+int jsonrpc_send_response(int fd,int response_type,json_t* result,char *id){
+	json_t *response;  //= (json_t*)malloc(sizeof(json_t));
+	if(response_type == RESPONSE_TYPE_SUCESS){
+		response = json_pack("{s:s s:s s:s}","jsonrpc","2.0","result","pass",/*json_dumps(result,JSON_COMPACT),*/"id",id);
+	}else if(response_type == RESPONSE_TYPE_FAILURE){
+		response = json_pack("{s:s s:s s:s}","jsonrpc","2.0","error","fail",/*json_dumps(result,JSON_COMPACT),*/"id",id);
+	}else{
+		syslog(LOG_ERR,"wrong response type");
+	}
+	char *final_response = strcat(json_dumps(response,JSON_COMPACT),"\n");
+	return send(fd,final_response,strlen(final_response),0);
+}
 
-
-int jsonrpc_register_method(char *method, json_t * (*jsonrpc_method)(jsonrpc_connection*,json_t*)){
+int jsonrpc_register_method(char *method, int (*jsonrpc_method)(jsonrpc_connection*,json_t*)){
 	if(jsonrpc_method_index < MAX_METHODS){
 		jsonrpc_methods_name[jsonrpc_method_index] = method;
 		jsonrpc_methods[jsonrpc_method_index] = jsonrpc_method;
@@ -38,27 +50,26 @@ int jsonrpc_register_method(char *method, json_t * (*jsonrpc_method)(jsonrpc_con
 	}
 }
 
-void jsonrpc_connection_handler(void * client_sock_fd){
+void jsonrpc_connection_handler(void * client_connection){
 	int res = 0;
 	//read
 	//parse
 	//invoke jsonrpc_mehtod
 	//send_response
 	//repeat
-	int client_fd = (int)client_sock_fd;
-	char buffer[10];
+	jsonrpc_connection *conn = (jsonrpc_connection*)client_connection;
+	int client_fd = (int)(conn->client_fd);
+	char buffer[1024];
 	struct pollfd *fds =(struct pollfd*) malloc(sizeof(struct pollfd));
 	fds->fd = client_fd;
 	fds->events = POLLIN;
 	res = poll(fds,1,60*1000);
-	if(res > 0)
-	while((fds->revents&POLLIN == POLLIN) && server_status){
-		res = recv(client_fd,buffer,10,0);
+	while((fds->revents&POLLIN == POLLIN) && server_status && (res > 0)){
+		res = recv(client_fd,buffer,1024,0);
 		//parse message here and invoke jsonrpc method
 		syslog(LOG_INFO,"Function pointer %p",jsonrpc_methods[jsonrpc_method_index]);
 		//syslog(LOG_INFO,"Recieved from %d: %s",client_fd,buffer);
-		jsonrpc_methods[jsonrpc_method_index](NULL,NULL);
-		perror("Calling function");
+		jsonrpc_methods[jsonrpc_method_index](conn,NULL);
 	}
 }
 void jsonrpc_connection_acceptor(){
@@ -79,8 +90,13 @@ void jsonrpc_connection_acceptor(){
 			}else{
 				syslog(LOG_INFO,"Got a connection %s",inet_ntoa(client_socket.sin_addr));
 				client_socket_fd[handler_threads_index] = res;
+				
+				jsonrpc_connection conn;
+				conn.client_fd = res;
+				client_connections[handler_threads_index] = conn;
+
 				syslog(LOG_INFO,"creating jsonrpc_handler pthread");
-				res = pthread_create(&handlers[handler_threads_index],NULL,jsonrpc_connection_handler,(void*)client_socket_fd[handler_threads_index]);
+				res = pthread_create(&handlers[handler_threads_index],NULL,jsonrpc_connection_handler,(void*)&client_connections[handler_threads_index]);
 				if(res != 0){
 					syslog(LOG_ERR,"connection handler threade create failed");
 					perror("connection handler thread creation");

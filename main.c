@@ -4,9 +4,12 @@
 
 
 json_t * test(jsonrpc_connection *conn,json_t* temp){
-
-	printf("teststetetsdtsdgfsdfasdfasdfgasdjcbsdjbhcasduk");
 	return NULL;
+}
+
+int echo(jsonrpc_connection *conn,json_t* temp){
+	jsonrpc_send_response(conn->client_fd,RESPONSE_TYPE_SUCESS,temp,conn->id);
+	return 0;
 }
 
 
@@ -17,14 +20,14 @@ void print_usage(){
 }
 int main(){
 	int command;
-	jsonrpc_register_method("test",&test);
+	jsonrpc_register_method("echo",&echo);
 	print_usage();
 	while(command = getchar()){
 		switch(command){
-			case 's': jsonrpc_server_start(2000);
+			case 's': jsonrpc_server_start(2001);
 				  break;
 			case 'k': return jsonrpc_server_stop();		
 		}
-		printf("\nEnter:");
+		printf("\n:");
 	}
 }

@@ -9,3 +9,4 @@ clean:
 	rm -rf *.o
 	rm -f server
 	rm -f tester
+	rm -rf *~

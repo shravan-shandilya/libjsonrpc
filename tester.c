@@ -16,7 +16,7 @@ int main(){
 	}
 
 	client_sock.sin_addr.s_addr = inet_addr("127.0.0.1");
-	client_sock.sin_port = 2000;
+	client_sock.sin_port = 2001;
 	client_sock.sin_family = AF_INET;
 	
 	res = connect(sock_fd,(struct sockaddr*)&client_sock,sizeof(struct sockaddr_in));
@@ -25,16 +25,16 @@ int main(){
 		return -1;
 	}
 	
-	char message[10],recieved[10];
+	char message[10],recieved[1024];
 	for(i=0;i<5;i++){
 		printf("Echo message: ");
 		scanf("%s",message);
 		send(sock_fd,message,10,0);
 		perror("Write");
-		printf("you wrote: %s",message);
-		//read(sock_fd,recieved,10);
-		//perror("Read");
-		//printf("Server sent: %s\n",recieved);
+		printf("you wrote: %si\n",message);
+		read(sock_fd,recieved,1024);
+		perror("Read");
+		printf("Server sent: %s\n",recieved);
 	}
 	close(sock_fd);
 	perror("closing sock fd client");
