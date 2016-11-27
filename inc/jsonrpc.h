@@ -27,7 +27,7 @@ int jsonrpc_send_response(int,int,json_t*,char*);
 typedef int (*jsonrpc_method)(jsonrpc_connection*,json_t*);
 
 int jsonrpc_register_method(char*,jsonrpc_method);
-
+void print_json_error(json_error_t*);
 
 int jsonrpc_client_init(char*,int);
 json_t* jsonrpc_client_invoke(char*,json_t*);

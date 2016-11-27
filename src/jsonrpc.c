@@ -7,6 +7,7 @@
 #include<pthread.h>
 #include<errno.h>
 #include<poll.h>
+#include<string.h>
 
 
 #define MAX_CONNECTIONS 20
@@ -30,9 +31,9 @@ jsonrpc_method jsonrpc_methods[MAX_METHODS];
 int jsonrpc_send_response(int fd,int response_type,json_t* result,char *id){
 	json_t *response;  //= (json_t*)malloc(sizeof(json_t));
 	if(response_type == RESPONSE_TYPE_SUCESS){
-		response = json_pack("{s:s s:s s:s}","jsonrpc","2.0","result","pass",/*json_dumps(result,JSON_COMPACT),*/"id",id);
+		response = json_pack("{s:s s:s s:s}","jsonrpc","2.0","result",json_dumps(result,JSON_COMPACT),"id",id);
 	}else if(response_type == RESPONSE_TYPE_FAILURE){
-		response = json_pack("{s:s s:s s:s}","jsonrpc","2.0","error","fail",/*json_dumps(result,JSON_COMPACT),*/"id",id);
+		response = json_pack("{s:s s:s s:s}","jsonrpc","2.0","error",json_dumps(result,JSON_COMPACT),"id",id);
 	}else{
 		syslog(LOG_ERR,"wrong response type");
 	}
@@ -41,35 +42,59 @@ int jsonrpc_send_response(int fd,int response_type,json_t* result,char *id){
 }
 
 int jsonrpc_register_method(char *method, int (*jsonrpc_method)(jsonrpc_connection*,json_t*)){
-	if(jsonrpc_method_index < MAX_METHODS){
+	if(jsonrpc_method_index < MAX_METHODS-1){
 		jsonrpc_methods_name[jsonrpc_method_index] = method;
 		jsonrpc_methods[jsonrpc_method_index] = jsonrpc_method;
 		syslog(LOG_INFO,"added jsonrpc_method %s with %p",jsonrpc_methods_name[jsonrpc_method_index],jsonrpc_methods[jsonrpc_method_index]);
+		jsonrpc_method_index += 1;
 	}else{
 		syslog(LOG_ERR,"max methods reached!");
 	}
 }
 
 void jsonrpc_connection_handler(void * client_connection){
-	int res = 0;
+	int i,res = 0;
 	//read
 	//parse
 	//invoke jsonrpc_mehtod
 	//send_response
 	//repeat
 	jsonrpc_connection *conn = (jsonrpc_connection*)client_connection;
+	json_error_t *err = (json_error_t*)malloc(sizeof(json_error_t));
 	int client_fd = (int)(conn->client_fd);
 	char buffer[1024];
+	memset(buffer,NULL,1024);
 	struct pollfd *fds =(struct pollfd*) malloc(sizeof(struct pollfd));
 	fds->fd = client_fd;
 	fds->events = POLLIN;
 	res = poll(fds,1,60*1000);
 	while((fds->revents&POLLIN == POLLIN) && server_status && (res > 0)){
 		res = recv(client_fd,buffer,1024,0);
+	
 		//parse message here and invoke jsonrpc method
-		syslog(LOG_INFO,"Function pointer %p",jsonrpc_methods[jsonrpc_method_index]);
-		//syslog(LOG_INFO,"Recieved from %d: %s",client_fd,buffer);
-		jsonrpc_methods[jsonrpc_method_index](conn,NULL);
+		json_t *msg = json_loads(buffer,JSON_DECODE_ANY,err);
+		const char *jsonrpc = json_string_value(json_object_get(msg,"jsonrpc"));
+		const char *method = json_string_value(json_object_get(msg,"method"));
+		json_t *params  = json_object_get(msg,"params");
+		const char *id = json_string_value(json_object_get(msg,"id"));
+		conn->id = id;
+		bool found  = false;
+		int found_index;
+		
+		//search for the method
+		for(i=0;i<jsonrpc_method_index;i++){
+			if(strcmp(jsonrpc_methods_name[i],method) == 0){
+				found = true;
+				found_index = i;
+				break;
+			}
+		}
+		if(!found){
+			json_t *not_found = json_pack("{s:i  s:s s:s}","code",-32601,"message","method not found","data","method not found");
+			jsonrpc_send_response(client_fd,RESPONSE_TYPE_FAILURE,not_found,id);
+		}else{
+			jsonrpc_methods[found_index](conn,params);
+		}
 	}
 }
 void jsonrpc_connection_acceptor(){
@@ -188,4 +213,11 @@ int jsonrpc_server_stop(){
 
 
 	return server_status;
+}
+void print_json_error(json_error_t *err){
+	printf("error message: %s",err->text);
+	printf("source: %s",err->source);
+	printf("line: %d",err->line);
+	printf("column: %d",err->column);
+	printf("position: %d",err->position);
 }

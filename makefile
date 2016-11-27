@@ -4,6 +4,7 @@ INC := ./inc
 
 all:
 	gcc $(SRC_FILES) -I$(INC) -o server -lpthread -ljansson
+	gcc tester.c -o tester
 
 clean:
 	rm -rf *.o

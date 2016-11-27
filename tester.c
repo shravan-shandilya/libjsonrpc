@@ -1,4 +1,5 @@
 #include<stdio.h>
+#include<string.h>
 #include<sys/socket.h>
 #include<arpa/inet.h>
 #include<netinet/in.h>
@@ -25,17 +26,12 @@ int main(){
 		return -1;
 	}
 	
-	char message[10],recieved[1024];
-	for(i=0;i<5;i++){
-		printf("Echo message: ");
-		scanf("%s",message);
-		send(sock_fd,message,10,0);
-		perror("Write");
-		printf("you wrote: %si\n",message);
-		read(sock_fd,recieved,1024);
-		perror("Read");
-		printf("Server sent: %s\n",recieved);
-	}
+	char recieved[1024];
+	memset(recieved,NULL,1024);
+	char *message = "{\"jsonrpc\":\"2.0\",\"method\":\"echo\",\"params\":[\"foo\",\"bar\"],\"id\":\"1\"}";
+	send(sock_fd,message,1024,0);
+	printf("you wrote: %s\n",message);
+	read(sock_fd,recieved,1024);
+	printf("Server sent: %s\n",recieved);
 	close(sock_fd);
-	perror("closing sock fd client");
 }
