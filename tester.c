@@ -27,7 +27,7 @@ int main(){
 	}
 	
 	char recieved[1024];
-	memset(recieved,NULL,1024);
+	memset(recieved,0,1024);
 	char *message = "{\"jsonrpc\":\"2.0\",\"method\":\"echo\",\"params\":[\"foo\",\"bar\"],\"id\":\"1\"}";
 	send(sock_fd,message,1024,0);
 	printf("you wrote: %s\n",message);
